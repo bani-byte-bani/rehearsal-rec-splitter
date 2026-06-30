@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Rehearsal Rec Splitter — 無音区間分解プレイヤー</title>
+<title>Silence Splitter — 無音区間分解プレイヤー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Shippori+Mincho:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -34,6 +34,284 @@
   body{
     min-height: 100vh;
     display:flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    padding: 28px 20px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  h1{
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .sub{
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  /* ---------- Main ---------- */
+  main{
+    flex: 1;
+    padding: 22px 20px 100px;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ---------- Drop zone ---------- */
+  .dropzone{
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease;
+    background: var(--bg-soft);
+    display: block;
+  }
+  .dropzone.drag{
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .dropzone .icon{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .dropzone .label{
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .dropzone .hint{
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  input[type=file]{ display:none; }
+
+  /* ---------- File info ---------- */
+  .file-info{
+    display:none;
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .file-info.show{ display:block; }
+  .file-info b{ color: var(--ink); font-weight: 500; }
+
+  /* ---------- Progress ---------- */
+  .progress-wrap{
+    display:none;
+    margin-top: 22px;
+  }
+  .progress-wrap.show{ display:block; }
+  .progress-label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display:flex;
+    justify-content: space-between;
+  }
+  .progress-track{
+    height: 2px;
+    background: var(--line);
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill{
+    position:absolute;
+    top:0; left:0; height:100%;
+    width:0%;
+    background: var(--accent);
+    transition: width .15s ease;
+  }
+
+  /* ---------- Result section ---------- */
+  .result{
+    display:none;
+    margin-top: 30px;
+  }
+  .result.show{ display:block; }
+
+  .result-summary{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+    line-height: 1.8;
+  }
+  .result-summary .num{
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ---------- Waveform ---------- */
+  .waveform-wrap{
+    position: relative;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  canvas#waveform{
+    display:block;
+    width: 100%;
+    height: 120px;
+    cursor: pointer;
+  }
+  .playhead{
+    position:absolute;
+    top:0; bottom:0;
+    width: 1px;
+    background: var(--ink);
+    pointer-events: none;
+    display:none;
+  }
+
+  .time-axis{
+    display:flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    padding: 4px 2px 0;
+    margin-bottom: 22px;
+  }
+
+  /* ---------- Section list ---------- */
+  .section-list{
+    display:flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .seg{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .seg:hover{ background: var(--bg-soft); }
+  .seg.playing{ background: var(--accent-soft); }
+  .seg.silence{
+    background: repeating-linear-gradient(
+      135deg,
+      var(--bg) 0px, var(--bg) 6px,
+      #efece5 6px, #efece5 12px
+    );
+    cursor: default;
+  }
+  .seg.silence:hover{ background: repeating-linear-gradient(
+      135deg,
+      var(--bg) 0px, var(--bg) 6px,
+      #efece5 6px, #efece5 12px
+    ); }
+
+  .seg-index{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    width: 24px;
+    flex-shrink: 0;
+  }
+
+  .seg-play{
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .seg.silence .seg-play{
+    visibility: hidden;
+  }
+  .seg.playing .seg-play{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .seg-body{
+    flex: 1;
+    min-width: 0;
+  }
+  .seg-title{
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .seg.silence .seg-title{
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .seg-time{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .seg-duration{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  /* ---------- Sticky transport ---------- */
+  .transport{
+    display:none;
+    position: fixed;
+    left:0; right:0; bottom:0;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    align-items:center;
+    gap:
     flex-direction: column;
   }
 
