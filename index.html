@@ -370,12 +370,12 @@
 
 <main>
 
-  <div class="dropzone" id="dropzone">
+  <label class="dropzone" id="dropzone" for="fileInput">
     <div class="icon">Step 01 — Upload</div>
     <div class="label">MP3ファイルを選択</div>
     <div class="hint">タップしてファイルを選ぶ、またはドラッグ＆ドロップ</div>
-    <input type="file" id="fileInput" accept="audio/*">
-  </div>
+    <input type="file" id="fileInput" accept="audio/*,.mp3">
+  </label>
 
   <div class="file-info" id="fileInfo"></div>
 
@@ -470,7 +470,8 @@
   }
 
   // ---------- File handling ----------
-  dropzone.addEventListener('click', () => fileInput.click());
+  // dropzone is a <label for="fileInput">, so tapping it natively opens the
+  // file chooser without needing JS. Only drag&drop is wired up here.
   dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
   dropzone.addEventListener('drop', e => {
@@ -726,7 +727,4 @@
   }
 
   function drawSectionList(){
-    sectionList.innerHTML = '';
-    let playIndex = 0;
-    segments.forEach((s, idx) => {
-      const div = document
+    se
