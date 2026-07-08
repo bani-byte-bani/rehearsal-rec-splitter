@@ -68,6 +68,14 @@
     line-height: 1.6;
   }
 
+  .build-info{
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    color: var(--line);
+  }
+
   /* ---------- Main ---------- */
   main{
     flex: 1;
@@ -473,6 +481,7 @@
   <div class="eyebrow">Practice Tape Analysis</div>
   <h1>rehearsal-rec-splitter</h1>
   <div class="sub">長尺の練習音源から、演奏していない無音区間（1分以上）を検出して分解します。</div>
+  <div class="build-info" id="buildInfo"></div>
 </header>
 
 <main>
@@ -509,6 +518,17 @@
       <div class="setting-slider-wrap">
         <input type="range" id="silenceDbSlider" min="-60" max="-10" step="1" value="-26">
         <div class="setting-value" id="silenceDbVal">-26 dB</div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        最小演奏時間
+        <span>これより短い演奏区間は無視</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="minPlaySlider" min="0" max="60" step="1" value="3">
+        <div class="setting-value" id="minPlayVal">3秒</div>
       </div>
     </div>
   </div>
@@ -552,15 +572,21 @@
   // ---------- Analysis interval (fixed) ----------
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
+  // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
+  const BUILD_TIMESTAMP = '2026-07-08 (最小演奏時間フィルタ追加)';
+
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const fileInfo = document.getElementById('fileInfo');
+  const buildInfo = document.getElementById('buildInfo');
   const settingsPanel = document.getElementById('settingsPanel');
   const silenceDurSlider = document.getElementById('silenceDurSlider');
   const silenceDurVal = document.getElementById('silenceDurVal');
   const silenceDbSlider = document.getElementById('silenceDbSlider');
   const silenceDbVal = document.getElementById('silenceDbVal');
+  const minPlaySlider = document.getElementById('minPlaySlider');
+  const minPlayVal = document.getElementById('minPlayVal');
   const reanalyzeBtn = document.getElementById('reanalyzeBtn');
   const progressWrap = document.getElementById('progressWrap');
   const progressFill = document.getElementById('progressFill');
@@ -617,6 +643,9 @@
   function getSilenceDb(){
     return parseInt(silenceDbSlider.value, 10);
   }
+  function getMinPlaySec(){
+    return parseInt(minPlaySlider.value, 10);
+  }
   // dB → RMS linear (0dBFS = RMS 1.0 の世界で)
   function dbToRms(db){
     return Math.pow(10, db / 20);
@@ -628,6 +657,7 @@
       ? (sec / 60).toFixed(sec % 60 === 0 ? 0 : 1) + '分'
       : sec + '秒';
     silenceDbVal.textContent = getSilenceDb() + ' dB';
+    minPlayVal.textContent = getMinPlaySec() + '秒';
   }
 
   silenceDurSlider.addEventListener('input', () => {
@@ -635,6 +665,10 @@
     reanalyzeBtn.classList.add('show');
   });
   silenceDbSlider.addEventListener('input', () => {
+    updateSliderLabels();
+    reanalyzeBtn.classList.add('show');
+  });
+  minPlaySlider.addEventListener('input', () => {
     updateSliderLabels();
     reanalyzeBtn.classList.add('show');
   });
@@ -648,6 +682,7 @@
   });
 
   updateSliderLabels();
+  buildInfo.textContent = 'build: ' + BUILD_TIMESTAMP;
 
   // ---------- File handling ----------
   // dropzone is a <label for="fileInput">, so tapping it natively opens the
@@ -809,8 +844,27 @@
       }
     }
 
+    // 最小演奏時間未満の 'play' 区間は 'silence' として扱う（ノイズ的な短い演奏の誤検出を除去）
+    const minPlaySec = getMinPlaySec();
+    const minPlayWindows = Math.ceil(minPlaySec / intervalSec);
+    for(const s of merged){
+      if(s.type === 'play' && (s.endI - s.startI) < minPlayWindows){
+        s.type = 'silence';
+      }
+    }
+
+    // 上記の型変更で隣接同士が同種になった区間を再マージ
+    const remerged = [];
+    for(const s of merged){
+      if(remerged.length && remerged[remerged.length-1].type === s.type){
+        remerged[remerged.length-1].endI = s.endI;
+      } else {
+        remerged.push({...s});
+      }
+    }
+
     // convert to time, clip to duration
-    const result = merged.map(s => ({
+    const result = remerged.map(s => ({
       type: s.type,
       start: Math.min(s.startI * intervalSec, totalDuration),
       end: Math.min(s.endI * intervalSec, totalDuration)
