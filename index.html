@@ -126,6 +126,114 @@
   .file-info.show{ display:block; }
   .file-info b{ color: var(--ink); font-weight: 500; }
 
+  /* ---------- Settings panel ---------- */
+  .settings-panel{
+    display: none;
+    margin-top: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .settings-panel.show{ display: block; }
+
+  .settings-title{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-soft);
+  }
+
+  .setting-row{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .setting-row:last-child{ border-bottom: none; }
+
+  .setting-label{
+    font-size: 13px;
+    color: var(--ink);
+    flex-shrink: 0;
+    width: 120px;
+  }
+  .setting-label span{
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .setting-slider-wrap{
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  input[type=range]{
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 2px;
+    background: var(--line);
+    border-radius: 1px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  input[type=range]::-moz-range-thumb{
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .setting-value{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    width: 56px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .reanalyze-btn{
+    display: none;
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity .15s ease;
+    margin-top: 14px;
+    border-radius: var(--radius);
+  }
+  .reanalyze-btn.show{ display: block; }
+  .reanalyze-btn:active{ opacity: 0.7; }
+
   /* ---------- Progress ---------- */
   .progress-wrap{
     display:none;
@@ -378,6 +486,35 @@
 
   <div class="file-info" id="fileInfo"></div>
 
+  <!-- Settings panel: visible after first analysis -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-title">Step 02 — Detection Settings</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        無音判定時間
+        <span>この秒数以上続いたら無音区間</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="silenceDurSlider" min="10" max="600" step="10" value="60">
+        <div class="setting-value" id="silenceDurVal">60秒</div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        無音判定閾値
+        <span>この音量以下を無音候補とする</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="silenceDbSlider" min="-60" max="-10" step="1" value="-26">
+        <div class="setting-value" id="silenceDbVal">-26 dB</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="reanalyze-btn" id="reanalyzeBtn">▶ この設定で再判定</button>
+
   <div class="progress-wrap" id="progressWrap">
     <div class="progress-label">
       <span id="progressLabel">解析中…</span>
@@ -412,15 +549,19 @@
 (function(){
   'use strict';
 
-  // ---------- Constants (hardcoded per current spec) ----------
-  const SILENCE_RATIO = 0.05;       // 全体最大RMSに対する5%以下を無音候補とみなす
-  const MIN_SILENCE_SEC = 1 * 60;   // 1分以上連続したら無音区間として確定
+  // ---------- Analysis interval (fixed) ----------
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const fileInfo = document.getElementById('fileInfo');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const silenceDurSlider = document.getElementById('silenceDurSlider');
+  const silenceDurVal = document.getElementById('silenceDurVal');
+  const silenceDbSlider = document.getElementById('silenceDbSlider');
+  const silenceDbVal = document.getElementById('silenceDbVal');
+  const reanalyzeBtn = document.getElementById('reanalyzeBtn');
   const progressWrap = document.getElementById('progressWrap');
   const progressFill = document.getElementById('progressFill');
   const progressPct = document.getElementById('progressPct');
@@ -440,6 +581,7 @@
   // ---------- State ----------
   let audioCtx = null;
   let audioBuffer = null;
+  let cachedRms = null;  // RMS解析結果をキャッシュ（設定変更時に再利用）
   let sourceNode = null;
   let isPlaying = false;
   let currentSegment = null; // {start, end, index}
@@ -467,6 +609,45 @@
     progressPct.textContent = Math.round(pct) + '%';
     if(label) progressLabel.textContent = label;
   }
+
+  // ---------- Settings helpers ----------
+  function getSilenceSec(){
+    return parseInt(silenceDurSlider.value, 10);
+  }
+  function getSilenceDb(){
+    return parseInt(silenceDbSlider.value, 10);
+  }
+  // dB → RMS linear (0dBFS = RMS 1.0 の世界で)
+  function dbToRms(db){
+    return Math.pow(10, db / 20);
+  }
+
+  function updateSliderLabels(){
+    const sec = getSilenceSec();
+    silenceDurVal.textContent = sec >= 60
+      ? (sec / 60).toFixed(sec % 60 === 0 ? 0 : 1) + '分'
+      : sec + '秒';
+    silenceDbVal.textContent = getSilenceDb() + ' dB';
+  }
+
+  silenceDurSlider.addEventListener('input', () => {
+    updateSliderLabels();
+    reanalyzeBtn.classList.add('show');
+  });
+  silenceDbSlider.addEventListener('input', () => {
+    updateSliderLabels();
+    reanalyzeBtn.classList.add('show');
+  });
+
+  reanalyzeBtn.addEventListener('click', () => {
+    if(!cachedRms || !audioBuffer) return;
+    reanalyzeBtn.classList.remove('show');
+    stopPlayback();
+    segments = detectSegments(cachedRms, ANALYSIS_INTERVAL_SEC, audioBuffer.duration);
+    renderResult();
+  });
+
+  updateSliderLabels();
 
   // ---------- File handling ----------
   // dropzone is a <label for="fileInput">, so tapping it natively opens the
@@ -506,13 +687,13 @@
 
       // Yield to UI before heavy analysis
       await sleep(30);
-      const rms = computeRMS(audioBuffer, ANALYSIS_INTERVAL_SEC, (p) => {
+      cachedRms = computeRMS(audioBuffer, ANALYSIS_INTERVAL_SEC, (p) => {
         setProgress(40 + p*40, '音量解析中…');
       });
 
       setProgress(85, '無音区間を判定中…');
       await sleep(20);
-      segments = detectSegments(rms, ANALYSIS_INTERVAL_SEC, audioBuffer.duration);
+      segments = detectSegments(cachedRms, ANALYSIS_INTERVAL_SEC, audioBuffer.duration);
 
       setProgress(95, '波形を描画中…');
       await sleep(20);
@@ -521,6 +702,10 @@
       setProgress(100, '完了');
       await sleep(150);
       progressWrap.classList.remove('show');
+
+      // 設定パネルを表示
+      settingsPanel.classList.add('show');
+      reanalyzeBtn.classList.remove('show');
 
       renderResult();
     }catch(err){
@@ -539,9 +724,12 @@
   function resetUI(){
     result.classList.remove('show');
     transport.classList.remove('show');
+    settingsPanel.classList.remove('show');
+    reanalyzeBtn.classList.remove('show');
     stopPlayback();
     segments = [];
     audioBuffer = null;
+    cachedRms = null;
     waveformPeaks = null;
   }
 
@@ -584,15 +772,15 @@
 
   // ---------- Segment detection ----------
   function detectSegments(rms, intervalSec, totalDuration){
-    let maxRms = 0;
-    for(let i=0;i<rms.length;i++){ if(rms[i] > maxRms) maxRms = rms[i]; }
-    const threshold = maxRms * SILENCE_RATIO;
-    const minSilenceWindows = Math.ceil(MIN_SILENCE_SEC / intervalSec);
+    // スライダーから現在の設定値を取得
+    const minSilenceSec = getSilenceSec();
+    const thresholdRms = dbToRms(getSilenceDb());
+    const minSilenceWindows = Math.ceil(minSilenceSec / intervalSec);
 
     // build raw boolean silence array
     const isSilent = new Uint8Array(rms.length);
     for(let i=0;i<rms.length;i++){
-      isSilent[i] = rms[i] <= threshold ? 1 : 0;
+      isSilent[i] = rms[i] <= thresholdRms ? 1 : 0;
     }
 
     // find runs
@@ -861,4 +1049,4 @@
 })();
 </script>
 </body>
-</html>h
+</html>
