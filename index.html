@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Silence Splitter — 無音区間分解プレイヤー</title>
+<title>rehearsal-rec-splitter — 無音区間分解プレイヤー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Shippori+Mincho:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #f5f3ef;
-    --bg-soft: #ebe8e1;
-    --ink: #1c1a17;
-    --ink-soft: #6b6760;
-    --line: #d8d3c8;
-    --accent: #b5482f;
-    --accent-soft: #e8d8d0;
-    --silence: #c9c4b8;
-    --silence-line: #a39d8e;
+    --bg: #141416;
+    --bg-soft: #1e1e22;
+    --ink: #e8e4dc;
+    --ink-soft: #7a7870;
+    --line: #2e2e34;
+    --accent: #c9a96e;
+    --accent-soft: #2a2318;
+    --silence: #232328;
+    --silence-line: #3a3a42;
     --radius: 2px;
   }
 
@@ -236,14 +236,14 @@
     background: repeating-linear-gradient(
       135deg,
       var(--bg) 0px, var(--bg) 6px,
-      #efece5 6px, #efece5 12px
+      #1e1e24 6px, #1e1e24 12px
     );
     cursor: default;
   }
   .seg.silence:hover{ background: repeating-linear-gradient(
       135deg,
       var(--bg) 0px, var(--bg) 6px,
-      #efece5 6px, #efece5 12px
+      #1e1e24 6px, #1e1e24 12px
     ); }
 
   .seg-index{
@@ -258,7 +258,7 @@
     width: 30px; height: 30px;
     border-radius: 50%;
     border: 1px solid var(--line);
-    background: var(--bg);
+    background: var(--bg-soft);
     flex-shrink: 0;
     display:flex;
     align-items:center;
@@ -363,8 +363,8 @@
 
 <header>
   <div class="eyebrow">Practice Tape Analysis</div>
-  <h1>Silence Splitter</h1>
-  <div class="sub">長尺の練習音源から、演奏していない無音区間（5分以上）を検出して分解します。</div>
+  <h1>rehearsal-rec-splitter</h1>
+  <div class="sub">長尺の練習音源から、演奏していない無音区間（1分以上）を検出して分解します。</div>
 </header>
 
 <main>
@@ -414,7 +414,7 @@
 
   // ---------- Constants (hardcoded per current spec) ----------
   const SILENCE_RATIO = 0.05;       // 全体最大RMSに対する5%以下を無音候補とみなす
-  const MIN_SILENCE_SEC = 5 * 60;   // 5分以上連続したら無音区間として確定
+  const MIN_SILENCE_SEC = 1 * 60;   // 1分以上連続したら無音区間として確定
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- DOM refs ----------
@@ -480,18 +480,11 @@
     if(f) handleFile(f);
   });
   fileInput.addEventListener('change', e => {
-    console.log('[DEBUG] change event fired, files:', e.target.files);
     const f = e.target.files[0];
-    if(f){
-      console.log('[DEBUG] file selected:', f.name, f.size, f.type);
-      handleFile(f);
-    } else {
-      console.log('[DEBUG] no file in event');
-    }
+    if(f) handleFile(f);
   });
 
   async function handleFile(file){
-    console.log('[DEBUG] handleFile start:', file.name);
     resetUI();
     fileInfo.innerHTML = '<b>' + escapeHtml(file.name) + '</b> — ' + fmtBytes(file.size);
     fileInfo.classList.add('show');
@@ -693,7 +686,7 @@
 
     // draw silence background bands first
     const styles = getComputedStyle(document.documentElement);
-    const silenceColor = '#e3dfd3';
+    const silenceColor = '#1e1e24';
     ctx.fillStyle = silenceColor;
     segments.filter(s=>s.type==='silence').forEach(s=>{
       const x1 = (s.start/duration) * w;
@@ -704,7 +697,7 @@
     // draw waveform peaks
     const peaks = waveformPeaks;
     const n = peaks.length;
-    ctx.fillStyle = '#1c1a17';
+    ctx.fillStyle = '#c9a96e';
     const barW = w / n;
     for(let i=0;i<n;i++){
       const amp = peaks[i];
@@ -714,7 +707,7 @@
     }
 
     // boundary lines between segments
-    ctx.strokeStyle = '#a39d8e';
+    ctx.strokeStyle = '#3a3a42';
     ctx.lineWidth = 1;
     segments.forEach(s=>{
       const x = (s.start/duration) * w;
