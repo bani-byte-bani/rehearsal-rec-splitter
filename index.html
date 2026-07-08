@@ -9,15 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Shippori+Mincho:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #141416;
-    --bg-soft: #1e1e22;
-    --ink: #e8e4dc;
-    --ink-soft: #7a7870;
-    --line: #2e2e34;
-    --accent: #c9a96e;
-    --accent-soft: #2a2318;
-    --silence: #232328;
-    --silence-line: #3a3a42;
+    --bg: #ece8e0;
+    --bg-soft: #ddd8cc;
+    --ink: #211f1b;
+    --ink-soft: #726d63;
+    --line: #cfc9bb;
+    --accent: #a97c3f;
+    --accent-soft: #ece0c8;
+    --silence: #d8d2c4;
+    --silence-line: #b6ae9c;
     --radius: 2px;
   }
 
@@ -87,6 +87,7 @@
 
   /* ---------- Drop zone ---------- */
   .dropzone{
+    position: relative;
     border: 1px dashed var(--line);
     border-radius: var(--radius);
     padding: 40px 20px;
@@ -117,7 +118,17 @@
     font-size: 12px;
     color: var(--ink-soft);
   }
-  input[type=file]{ display:none; }
+  input[type=file]{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
 
   /* ---------- File info ---------- */
   .file-info{
@@ -402,14 +413,14 @@
     background: repeating-linear-gradient(
       135deg,
       var(--bg) 0px, var(--bg) 6px,
-      #1e1e24 6px, #1e1e24 12px
+      #e2ddd0 6px, #e2ddd0 12px
     );
     cursor: default;
   }
   .seg.silence:hover{ background: repeating-linear-gradient(
       135deg,
       var(--bg) 0px, var(--bg) 6px,
-      #1e1e24 6px, #1e1e24 12px
+      #e2ddd0 6px, #e2ddd0 12px
     ); }
 
   .seg-index{
@@ -508,6 +519,23 @@
     color: var(--ink-soft);
     margin-top: 2px;
   }
+
+  .split-here-btn{
+    display: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .split-here-btn.show{ display: block; }
+  .split-here-btn:active{ opacity: 0.7; }
 
   /* ---------- Misc ---------- */
   .status-msg{
@@ -628,6 +656,7 @@
     <div class="transport-title" id="transportTitle">—</div>
     <div class="transport-time" id="transportTime">00:00 / 00:00</div>
   </div>
+  <button class="split-here-btn" id="splitHereBtn">✂️ ここで分割</button>
 </div>
 
 <script>
@@ -638,7 +667,7 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-08 (プレビューモード追加: 任意位置再生+速度切替)';
+  const BUILD_TIMESTAMP = '2026-07-08 (file input表示バグ修正: visually-hiddenパターンに変更)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
@@ -671,6 +700,7 @@
   const transportBtn = document.getElementById('transportBtn');
   const transportTitle = document.getElementById('transportTitle');
   const transportTime = document.getElementById('transportTime');
+  const splitHereBtn = document.getElementById('splitHereBtn');
 
   // ---------- State ----------
   let audioCtx = null;
@@ -848,6 +878,7 @@
     modeSwitch.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'normal'));
     speedSwitch.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b.dataset.rate === '1'));
     speedSwitch.classList.remove('show');
+    splitHereBtn.classList.remove('show');
     canvas.classList.remove('split-mode', 'preview-mode');
     splitHint.textContent = 'タップした区間を再生します';
     audioBuffer = null;
@@ -1038,7 +1069,7 @@
 
     // draw silence background bands first
     const styles = getComputedStyle(document.documentElement);
-    const silenceColor = '#1e1e24';
+    const silenceColor = '#e2ddd0';
     ctx.fillStyle = silenceColor;
     segments.filter(s=>s.type==='silence').forEach(s=>{
       const x1 = (s.start/duration) * w;
@@ -1049,7 +1080,7 @@
     // draw waveform peaks
     const peaks = waveformPeaks;
     const n = peaks.length;
-    ctx.fillStyle = '#c9a96e';
+    ctx.fillStyle = '#211f1b';
     const barW = w / n;
     for(let i=0;i<n;i++){
       const amp = peaks[i];
@@ -1059,7 +1090,7 @@
     }
 
     // boundary lines between segments
-    ctx.strokeStyle = '#3a3a42';
+    ctx.strokeStyle = '#b6ae9c';
     ctx.lineWidth = 1;
     segments.forEach(s=>{
       const x = (s.start/duration) * w;
@@ -1070,7 +1101,7 @@
     });
 
     // manual split lines (ユーザーが追加した分割点。目立つアクセントカラーで描画)
-    ctx.strokeStyle = '#c9a96e';
+    ctx.strokeStyle = '#a97c3f';
     ctx.lineWidth = 2;
     manualSplits.forEach(t=>{
       const x = (t/duration) * w;
@@ -1182,6 +1213,17 @@
     startPlayback(seg.start, seg.end, title, 1, idx);
   }
 
+  // 再生中の現在の絶対時刻（秒）を計算する。再生中でなければnull。
+  function getCurrentPlaybackTime(){
+    if(!isPlaying || !currentPlayback) return null;
+    const rate = currentPlayback.rate;
+    const elapsedReal = audioCtx.currentTime - playStartCtxTime;
+    const elapsedInBuffer = elapsedReal * rate;
+    const segDur = currentPlayback.end - currentPlayback.start;
+    const curTimeInSeg = Math.min(elapsedInBuffer, segDur);
+    return currentPlayback.start + curTimeInSeg;
+  }
+
   function updatePlayhead(){
     if(!isPlaying || !currentPlayback){ return; }
     const rate = currentPlayback.rate;
@@ -1233,6 +1275,7 @@
     canvas.classList.toggle('split-mode', mode === 'split');
     canvas.classList.toggle('preview-mode', mode === 'preview');
     speedSwitch.classList.toggle('show', mode === 'preview');
+    splitHereBtn.classList.toggle('show', mode === 'preview');
     stopPlayback();
   });
 
@@ -1290,6 +1333,19 @@
     if(seg && seg.type === 'play'){
       const idx = segments.indexOf(seg);
       playSegment(seg, idx, '演奏区間（波形タップ）');
+    }
+  });
+
+  // ---------- Split at current preview position ----------
+  splitHereBtn.addEventListener('click', () => {
+    const t = getCurrentPlaybackTime();
+    if(t == null) return;
+    // 既存の分割点とほぼ同じ位置なら追加しない（誤連打対策）
+    const exists = manualSplits.some(s => Math.abs(s - t) < 0.2);
+    if(!exists){
+      manualSplits.push(t);
+      segments = applyManualSplits(rawSegments, audioBuffer.duration);
+      renderResult(); // 再生は止めずに波形とリストだけ再描画
     }
   });
 
