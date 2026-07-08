@@ -292,38 +292,48 @@
     font-weight: 500;
   }
 
-  /* ---------- Split controls ---------- */
-  .split-controls{
+  /* ---------- Mode / speed controls ---------- */
+  .mode-controls{
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
-  .split-mode-btn{
+  .mode-switch, .speed-switch{
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .mode-btn, .speed-btn{
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    letter-spacing: 0.04em;
-    padding: 7px 14px;
+    letter-spacing: 0.03em;
+    padding: 7px 12px;
     border: 1px solid var(--line);
     border-radius: 999px;
     background: var(--bg-soft);
     color: var(--ink-soft);
     cursor: pointer;
-    flex-shrink: 0;
     transition: background .15s ease, color .15s ease, border-color .15s ease;
   }
-  .split-mode-btn.active{
+  .mode-btn.active, .speed-btn.active{
     background: var(--accent);
     border-color: var(--accent);
     color: var(--bg);
+  }
+  .speed-switch{
+    display: none;
+  }
+  .speed-switch.show{
+    display: flex;
   }
   .split-hint{
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     color: var(--ink-soft);
-    text-align: right;
-    flex: 1;
+    margin-bottom: 10px;
   }
 
   /* ---------- Waveform ---------- */
@@ -343,6 +353,9 @@
   }
   canvas#waveform.split-mode{
     cursor: crosshair;
+  }
+  canvas#waveform.preview-mode{
+    cursor: text;
   }
   .playhead{
     position:absolute;
@@ -564,7 +577,7 @@
         <span>これより短い演奏区間は無視</span>
       </div>
       <div class="setting-slider-wrap">
-        <input type="range" id="minPlaySlider" min="0" max="3" step="1" value="3">
+        <input type="range" id="minPlaySlider" min="0" max="180" step="5" value="3">
         <div class="setting-value" id="minPlayVal">3秒</div>
       </div>
     </div>
@@ -583,10 +596,20 @@
   <div class="result" id="result">
     <div class="result-summary" id="resultSummary"></div>
 
-    <div class="split-controls">
-      <button class="split-mode-btn" id="splitModeBtn">✂️ 分割モード: OFF</button>
-      <div class="split-hint" id="splitHint">波形をタップして再生</div>
+    <div class="mode-controls">
+      <div class="mode-switch" id="modeSwitch">
+        <button class="mode-btn active" data-mode="normal">▶ 再生</button>
+        <button class="mode-btn" data-mode="split">✂️ 分割</button>
+        <button class="mode-btn" data-mode="preview">⏩ プレビュー</button>
+      </div>
+      <div class="speed-switch" id="speedSwitch">
+        <button class="speed-btn active" data-rate="1">1x</button>
+        <button class="speed-btn" data-rate="1.25">1.25x</button>
+        <button class="speed-btn" data-rate="1.5">1.5x</button>
+        <button class="speed-btn" data-rate="2">2x</button>
+      </div>
     </div>
+    <div class="split-hint" id="splitHint">タップした区間を再生します</div>
 
     <div class="waveform-wrap">
       <canvas id="waveform"></canvas>
@@ -615,7 +638,7 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-08 (波形クリック分割機能・最小演奏時間0-3秒化)';
+  const BUILD_TIMESTAMP = '2026-07-08 (プレビューモード追加: 任意位置再生+速度切替)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
@@ -636,7 +659,8 @@
   const progressLabel = document.getElementById('progressLabel');
   const result = document.getElementById('result');
   const resultSummary = document.getElementById('resultSummary');
-  const splitModeBtn = document.getElementById('splitModeBtn');
+  const modeSwitch = document.getElementById('modeSwitch');
+  const speedSwitch = document.getElementById('speedSwitch');
   const splitHint = document.getElementById('splitHint');
   const canvas = document.getElementById('waveform');
   const ctx = canvas.getContext('2d');
@@ -654,11 +678,13 @@
   let cachedRms = null;  // RMS解析結果をキャッシュ（設定変更時に再利用）
   let sourceNode = null;
   let isPlaying = false;
-  let currentSegment = null; // {start, end, index}
+  // 再生中の区間情報。segIdxはセクションリストのハイライト対象（プレビュー再生時はnull）
+  let currentPlayback = null; // {start, end, title, rate, segIdx}
   let rawSegments = [];  // detectSegments()の生の結果（手動分割なし）
   let segments = []; // [{type:'play'|'silence', start, end}] 手動分割適用後の最終結果
   let manualSplits = []; // ユーザーが波形タップで追加した分割時刻（秒）のリスト
-  let splitModeActive = false;
+  let interactionMode = 'normal'; // 'normal' | 'split' | 'preview'
+  let previewRate = 1; // プレビューモードでの再生速度
   let playStartCtxTime = 0;
   let playOffsetInSegment = 0;
   let rafId = null;
@@ -698,13 +724,16 @@
     return Math.pow(10, db / 20);
   }
 
-  function updateSliderLabels(){
-    const sec = getSilenceSec();
-    silenceDurVal.textContent = sec >= 60
+  function fmtSliderSec(sec){
+    return sec >= 60
       ? (sec / 60).toFixed(sec % 60 === 0 ? 0 : 1) + '分'
       : sec + '秒';
+  }
+
+  function updateSliderLabels(){
+    silenceDurVal.textContent = fmtSliderSec(getSilenceSec());
     silenceDbVal.textContent = getSilenceDb() + ' dB';
-    minPlayVal.textContent = getMinPlaySec() + '秒';
+    minPlayVal.textContent = fmtSliderSec(getMinPlaySec());
   }
 
   silenceDurSlider.addEventListener('input', () => {
@@ -814,11 +843,13 @@
     segments = [];
     rawSegments = [];
     manualSplits = [];
-    splitModeActive = false;
-    splitModeBtn.classList.remove('active');
-    splitModeBtn.textContent = '✂️ 分割モード: OFF';
-    canvas.classList.remove('split-mode');
-    splitHint.textContent = '波形をタップして再生';
+    interactionMode = 'normal';
+    previewRate = 1;
+    modeSwitch.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'normal'));
+    speedSwitch.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b.dataset.rate === '1'));
+    speedSwitch.classList.remove('show');
+    canvas.classList.remove('split-mode', 'preview-mode');
+    splitHint.textContent = 'タップした区間を再生します';
     audioBuffer = null;
     cachedRms = null;
     waveformPeaks = null;
@@ -1107,17 +1138,22 @@
     transportBtn.textContent = '▶';
   }
 
-  function playSegment(seg, idx, title){
+  // 汎用の再生開始関数。start〜end（省略時は曲の終端まで）をrateの速度で再生する。
+  // segIdxを渡すとセクションリストの該当行をハイライトする（プレビュー再生時はnull）。
+  function startPlayback(start, end, title, rate, segIdx){
     if(!audioBuffer) return;
     stopPlayback();
 
-    currentSegment = {start: seg.start, end: seg.end, idx};
+    const playEnd = (end != null) ? end : audioBuffer.duration;
+    currentPlayback = { start, end: playEnd, title, rate, segIdx };
+
     sourceNode = audioCtx.createBufferSource();
     sourceNode.buffer = audioBuffer;
+    sourceNode.playbackRate.value = rate;
     sourceNode.connect(audioCtx.destination);
 
-    const dur = seg.end - seg.start;
-    sourceNode.start(0, seg.start, dur);
+    const bufferDur = playEnd - start; // バッファ時間軸での長さ（rateの影響を受けない）
+    sourceNode.start(0, start, bufferDur);
     playStartCtxTime = audioCtx.currentTime;
     isPlaying = true;
 
@@ -1128,8 +1164,10 @@
     };
 
     document.querySelectorAll('.seg').forEach(el => el.classList.remove('playing'));
-    const el = sectionList.querySelector('[data-idx="' + idx + '"]');
-    if(el) el.classList.add('playing');
+    if(segIdx != null){
+      const el = sectionList.querySelector('[data-idx="' + segIdx + '"]');
+      if(el) el.classList.add('playing');
+    }
 
     transport.classList.add('show');
     transportTitle.textContent = title;
@@ -1139,12 +1177,19 @@
     updatePlayhead();
   }
 
+  // 従来のセクションリストからの再生（等速のみ）
+  function playSegment(seg, idx, title){
+    startPlayback(seg.start, seg.end, title, 1, idx);
+  }
+
   function updatePlayhead(){
-    if(!isPlaying || !currentSegment){ return; }
-    const elapsed = audioCtx.currentTime - playStartCtxTime;
-    const segDur = currentSegment.end - currentSegment.start;
-    const curTimeInSeg = Math.min(elapsed, segDur);
-    const curTimeAbs = currentSegment.start + curTimeInSeg;
+    if(!isPlaying || !currentPlayback){ return; }
+    const rate = currentPlayback.rate;
+    const elapsedReal = audioCtx.currentTime - playStartCtxTime;
+    const elapsedInBuffer = elapsedReal * rate; // 再生速度を考慮したバッファ時間軸での経過
+    const segDur = currentPlayback.end - currentPlayback.start;
+    const curTimeInSeg = Math.min(elapsedInBuffer, segDur);
+    const curTimeAbs = currentPlayback.start + curTimeInSeg;
 
     const duration = audioBuffer.duration;
     const w = canvas.getBoundingClientRect().width;
@@ -1153,7 +1198,7 @@
 
     transportTime.textContent = fmtTime(curTimeInSeg) + ' / ' + fmtTime(segDur);
 
-    if(elapsed >= segDur){
+    if(elapsedInBuffer >= segDur){
       stopPlayback();
       return;
     }
@@ -1163,25 +1208,56 @@
   transportBtn.addEventListener('click', () => {
     if(isPlaying){
       stopPlayback();
-    } else if(currentSegment){
-      const seg = segments[currentSegment.idx];
-      const title = transportTitle.textContent;
-      playSegment(seg, currentSegment.idx, title);
+    } else if(currentPlayback){
+      const { start, end, title, rate, segIdx } = currentPlayback;
+      startPlayback(start, end, title, rate, segIdx);
     }
   });
 
-  // ---------- Split mode toggle ----------
-  splitModeBtn.addEventListener('click', () => {
-    splitModeActive = !splitModeActive;
-    splitModeBtn.classList.toggle('active', splitModeActive);
-    splitModeBtn.textContent = splitModeActive ? '✂️ 分割モード: ON' : '✂️ 分割モード: OFF';
-    canvas.classList.toggle('split-mode', splitModeActive);
-    splitHint.textContent = splitModeActive
-      ? 'タップで分割点を追加／分割点をタップで削除'
-      : '波形をタップして再生';
+  // ---------- Mode switch (通常 / 分割 / プレビュー) ----------
+  const modeHints = {
+    normal: 'タップした区間を再生します',
+    split: 'タップで分割点を追加／分割点をタップで削除',
+    preview: 'タップした位置から再生します（速度切替で分割ポイントを探せます）'
+  };
+
+  modeSwitch.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mode-btn');
+    if(!btn) return;
+    const mode = btn.dataset.mode;
+    if(mode === interactionMode) return;
+
+    interactionMode = mode;
+    modeSwitch.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    splitHint.textContent = modeHints[mode];
+    canvas.classList.toggle('split-mode', mode === 'split');
+    canvas.classList.toggle('preview-mode', mode === 'preview');
+    speedSwitch.classList.toggle('show', mode === 'preview');
+    stopPlayback();
   });
 
-  // click on waveform: 通常時は再生、分割モード時は分割点の追加・削除
+  // ---------- Speed switch (プレビューモード時の再生速度) ----------
+  speedSwitch.addEventListener('click', (e) => {
+    const btn = e.target.closest('.speed-btn');
+    if(!btn) return;
+    const rate = parseFloat(btn.dataset.rate);
+    if(rate === previewRate) return;
+
+    speedSwitch.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b === btn));
+
+    // プレビュー再生中に速度を変えた場合は、現在位置から新しい速度でシームレスに再開する
+    if(isPlaying && currentPlayback && currentPlayback.segIdx == null){
+      const elapsedReal = audioCtx.currentTime - playStartCtxTime;
+      const elapsedInBuffer = elapsedReal * previewRate;
+      const curTimeAbs = currentPlayback.start + elapsedInBuffer;
+      previewRate = rate;
+      startPlayback(curTimeAbs, audioBuffer.duration, 'プレビュー再生', rate, null);
+    } else {
+      previewRate = rate;
+    }
+  });
+
+  // click on waveform: モードごとに挙動を切り替える
   canvas.addEventListener('click', (e) => {
     if(!audioBuffer) return;
     const rect = canvas.getBoundingClientRect();
@@ -1189,7 +1265,7 @@
     const ratio = x / rect.width;
     const t = ratio * audioBuffer.duration;
 
-    if(splitModeActive){
+    if(interactionMode === 'split'){
       const pxPerSec = rect.width / audioBuffer.duration;
       const hitIdx = manualSplits.findIndex(s => Math.abs(s - t) * pxPerSec < 8);
       if(hitIdx >= 0){
@@ -1203,6 +1279,13 @@
       return;
     }
 
+    if(interactionMode === 'preview'){
+      // タップした任意の位置から曲の終端まで、現在の速度設定で再生する
+      startPlayback(t, audioBuffer.duration, 'プレビュー再生', previewRate, null);
+      return;
+    }
+
+    // 通常モード: タップした区間（演奏区間のみ）を等速再生
     const seg = segments.find(s => t >= s.start && t < s.end);
     if(seg && seg.type === 'play'){
       const idx = segments.indexOf(seg);
