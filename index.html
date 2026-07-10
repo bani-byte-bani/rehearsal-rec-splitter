@@ -87,6 +87,7 @@
 
   /* ---------- Drop zone ---------- */
   .dropzone{
+    display: block;
     position: relative;
     overflow: hidden;
     border: 1px dashed var(--line);
@@ -121,9 +122,10 @@
   }
   input[type=file]{
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 0;
+    width: 2000px;
+    height: 2000px;
     opacity: 0;
     cursor: pointer;
     margin: 0;
@@ -709,7 +711,7 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-10 (プレビュー時に波形を5分幅ズーム表示するよう対応)';
+  const BUILD_TIMESTAMP = '2026-07-10 (根本原因を修正: .dropzoneにdisplay:block追加。帯バグ解消)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
