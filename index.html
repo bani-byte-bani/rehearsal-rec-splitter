@@ -88,6 +88,7 @@
   /* ---------- Drop zone ---------- */
   .dropzone{
     position: relative;
+    overflow: hidden;
     border: 1px dashed var(--line);
     border-radius: var(--radius);
     padding: 40px 20px;
@@ -120,13 +121,13 @@
   }
   input[type=file]{
     position: absolute;
-    width: 1px;
-    height: 1px;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    margin: 0;
     padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    white-space: nowrap;
     border: 0;
   }
 
@@ -301,6 +302,26 @@
   .result-summary .num{
     color: var(--accent);
     font-weight: 500;
+  }
+
+  .download-all-btn{
+    display: block;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-soft);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .download-all-btn:hover{
+    border-color: var(--accent);
+    background: var(--accent-soft);
   }
 
   /* ---------- Mode / speed controls ---------- */
@@ -478,6 +499,26 @@
     flex-shrink: 0;
   }
 
+  .seg-download{
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .seg-download:hover{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
   /* ---------- Sticky transport ---------- */
   .transport{
     display:none;
@@ -623,6 +664,7 @@
 
   <div class="result" id="result">
     <div class="result-summary" id="resultSummary"></div>
+    <button class="download-all-btn" id="downloadAllBtn">⬇ 演奏区間をすべてダウンロード</button>
 
     <div class="mode-controls">
       <div class="mode-switch" id="modeSwitch">
@@ -667,7 +709,7 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-08 (file input表示バグ修正: visually-hiddenパターンに変更)';
+  const BUILD_TIMESTAMP = '2026-07-10 (file input CSSを標準パターンに再修正・WAVダウンロード機能追加)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
@@ -688,6 +730,7 @@
   const progressLabel = document.getElementById('progressLabel');
   const result = document.getElementById('result');
   const resultSummary = document.getElementById('resultSummary');
+  const downloadAllBtn = document.getElementById('downloadAllBtn');
   const modeSwitch = document.getElementById('modeSwitch');
   const speedSwitch = document.getElementById('speedSwitch');
   const splitHint = document.getElementById('splitHint');
@@ -719,6 +762,7 @@
   let playOffsetInSegment = 0;
   let rafId = null;
   let waveformPeaks = null; // downsampled peaks for drawing
+  let baseFilename = 'audio'; // ダウンロード時のファイル名のベース（拡張子なし）
 
   // ---------- Helpers ----------
   function fmtTime(sec){
@@ -809,6 +853,7 @@
 
   async function handleFile(file){
     resetUI();
+    baseFilename = file.name.replace(/\.[^/.]+$/, '') || 'audio';
     fileInfo.innerHTML = '<b>' + escapeHtml(file.name) + '</b> — ' + fmtBytes(file.size);
     fileInfo.classList.add('show');
     progressWrap.classList.add('show');
@@ -1014,6 +1059,86 @@
     return result;
   }
 
+  // ---------- Download (WAV export) ----------
+  // AudioBufferの指定区間を16bit PCM WAVにエンコードしてBlobを返す
+  function bufferSliceToWavBlob(buffer, startSec, endSec){
+    const sampleRate = buffer.sampleRate;
+    const numChannels = buffer.numberOfChannels;
+    const startFrame = Math.max(0, Math.floor(startSec * sampleRate));
+    const endFrame = Math.min(buffer.length, Math.ceil(endSec * sampleRate));
+    const frameCount = Math.max(0, endFrame - startFrame);
+
+    const bytesPerSample = 2; // 16bit
+    const blockAlign = numChannels * bytesPerSample;
+    const dataSize = frameCount * blockAlign;
+    const headerSize = 44;
+    const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
+    const view = new DataView(arrayBuffer);
+
+    function writeString(offset, str){
+      for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i));
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);          // fmtチャンクサイズ
+    view.setUint16(20, 1, true);           // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true); // byteRate
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);          // bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    // channelデータをインターリーブしながら16bit整数に変換して書き込む
+    const channels = [];
+    for(let c=0;c<numChannels;c++){
+      channels.push(buffer.getChannelData(c));
+    }
+    let offset = headerSize;
+    for(let i=0; i<frameCount; i++){
+      for(let c=0; c<numChannels; c++){
+        let sample = channels[c][startFrame + i] || 0;
+        sample = Math.max(-1, Math.min(1, sample));
+        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  }
+
+  function downloadSegment(seg, playIndex){
+    if(!audioBuffer) return;
+    const blob = bufferSliceToWavBlob(audioBuffer, seg.start, seg.end);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = baseFilename + '_seg' + String(playIndex).padStart(2,'0') + '.wav';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // 演奏区間を順番にダウンロード（ブラウザが一度に大量のダウンロードをブロックしないよう間隔を空ける）
+  async function downloadAllSegments(){
+    if(!audioBuffer) return;
+    const playSegs = segments.filter(s => s.type === 'play');
+    for(let i=0; i<playSegs.length; i++){
+      downloadSegment(playSegs[i], i+1);
+      await sleep(300);
+    }
+  }
+
+  downloadAllBtn.addEventListener('click', () => {
+    downloadAllSegments();
+  });
+
   // ---------- Waveform peaks ----------
   function computePeaks(buffer, numBuckets){
     const data = buffer.getChannelData(0);
@@ -1147,10 +1272,19 @@
           '<div class="seg-title">' + titleText + '</div>' +
           '<div class="seg-time">' + fmtTime(s.start) + ' – ' + fmtTime(s.end) + '</div>' +
         '</div>' +
-        '<div class="seg-duration">' + fmtTime(s.end - s.start) + '</div>';
+        '<div class="seg-duration">' + fmtTime(s.end - s.start) + '</div>' +
+        (s.type === 'play' ? '<div class="seg-download" title="この区間をWAVでダウンロード">⬇</div>' : '');
 
       if(s.type === 'play'){
-        div.addEventListener('click', () => playSegment(s, idx, titleText));
+        div.addEventListener('click', (e) => {
+          if(e.target.closest('.seg-download')) return; // ダウンロードボタンのクリックは再生と分離
+          playSegment(s, idx, titleText);
+        });
+        const dlBtn = div.querySelector('.seg-download');
+        dlBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadSegment(s, playIndex);
+        });
       }
       sectionList.appendChild(div);
     });
