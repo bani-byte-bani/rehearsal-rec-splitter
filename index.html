@@ -709,7 +709,7 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-10 (file input CSSを標準パターンに再修正・WAVダウンロード機能追加)';
+  const BUILD_TIMESTAMP = '2026-07-10 (プレビュー時に波形を5分幅ズーム表示するよう対応)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
@@ -763,6 +763,40 @@
   let rafId = null;
   let waveformPeaks = null; // downsampled peaks for drawing
   let baseFilename = 'audio'; // ダウンロード時のファイル名のベース（拡張子なし）
+
+  // ---------- プレビュー時のズーム表示 ----------
+  const ZOOM_WINDOW_SEC = 300; // ズーム時に表示する幅（5分）
+  let zoomActive = false;
+  let viewStart = 0;
+  let viewEnd = 0;
+  let zoomedPeaksCache = null; // { start, end, peaks } 直近計算したズーム範囲のピークをキャッシュ
+
+  // 現在の表示範囲（ズーム中ならその範囲、そうでなければ曲全体）を返す
+  function getViewRange(){
+    if(zoomActive && audioBuffer){
+      return { start: viewStart, end: viewEnd };
+    }
+    return { start: 0, end: audioBuffer ? audioBuffer.duration : 0 };
+  }
+
+  // 指定した中心時刻にズームウィンドウを合わせる（画面端はクランプする）
+  function centerZoomOn(t){
+    if(!audioBuffer) return;
+    const duration = audioBuffer.duration;
+    const half = ZOOM_WINDOW_SEC / 2;
+    let start = t - half;
+    let end = t + half;
+    if(end - start > duration){
+      start = 0; end = duration;
+    } else if(start < 0){
+      start = 0; end = Math.min(duration, ZOOM_WINDOW_SEC);
+    } else if(end > duration){
+      end = duration; start = Math.max(0, duration - ZOOM_WINDOW_SEC);
+    }
+    viewStart = start;
+    viewEnd = end;
+    zoomedPeaksCache = null; // 範囲が変わったのでピークを再計算させる
+  }
 
   // ---------- Helpers ----------
   function fmtTime(sec){
@@ -929,6 +963,10 @@
     audioBuffer = null;
     cachedRms = null;
     waveformPeaks = null;
+    zoomActive = false;
+    viewStart = 0;
+    viewEnd = 0;
+    zoomedPeaksCache = null;
   }
 
   // ---------- RMS computation ----------
@@ -1158,6 +1196,28 @@
     return peaks;
   }
 
+  // 指定した時間範囲（startSec〜endSec）だけを対象にピークを計算する（プレビュー時のズーム表示用）
+  function computePeaksForRange(buffer, startSec, endSec, numBuckets){
+    const data = buffer.getChannelData(0);
+    const sampleRate = buffer.sampleRate;
+    const startFrame = Math.max(0, Math.floor(startSec * sampleRate));
+    const endFrame = Math.min(data.length, Math.ceil(endSec * sampleRate));
+    const rangeLen = Math.max(1, endFrame - startFrame);
+    const bucketSize = Math.floor(rangeLen / numBuckets) || 1;
+    const peaks = new Float32Array(numBuckets);
+    for(let b=0; b<numBuckets; b++){
+      const bStart = startFrame + b * bucketSize;
+      const bEnd = Math.min(bStart + bucketSize, endFrame);
+      let max = 0;
+      for(let i=bStart; i<bEnd; i++){
+        const v = Math.abs(data[i]);
+        if(v > max) max = v;
+      }
+      peaks[b] = max;
+    }
+    return peaks;
+  }
+
   // ---------- Rendering ----------
   function renderResult(){
     result.classList.add('show');
@@ -1189,21 +1249,35 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,w,h);
 
-    const duration = audioBuffer.duration;
+    const view = getViewRange();
+    const viewDur = view.end - view.start;
     const mid = h/2;
 
     // draw silence background bands first
-    const styles = getComputedStyle(document.documentElement);
     const silenceColor = '#e2ddd0';
     ctx.fillStyle = silenceColor;
     segments.filter(s=>s.type==='silence').forEach(s=>{
-      const x1 = (s.start/duration) * w;
-      const x2 = (s.end/duration) * w;
+      const x1 = ((s.start - view.start)/viewDur) * w;
+      const x2 = ((s.end - view.start)/viewDur) * w;
       ctx.fillRect(x1, 0, Math.max(1, x2-x1), h);
     });
 
-    // draw waveform peaks
-    const peaks = waveformPeaks;
+    // draw waveform peaks（ズーム中は現在の表示範囲だけを高解像度で再計算したピークを使う）
+    let peaks;
+    if(zoomActive){
+      if(!zoomedPeaksCache || zoomedPeaksCache.start !== view.start || zoomedPeaksCache.end !== view.end || zoomedPeaksCache.w !== w){
+        const numBuckets = Math.max(100, Math.floor(w));
+        zoomedPeaksCache = {
+          start: view.start,
+          end: view.end,
+          w: w,
+          peaks: computePeaksForRange(audioBuffer, view.start, view.end, numBuckets)
+        };
+      }
+      peaks = zoomedPeaksCache.peaks;
+    } else {
+      peaks = waveformPeaks;
+    }
     const n = peaks.length;
     ctx.fillStyle = '#211f1b';
     const barW = w / n;
@@ -1218,7 +1292,7 @@
     ctx.strokeStyle = '#b6ae9c';
     ctx.lineWidth = 1;
     segments.forEach(s=>{
-      const x = (s.start/duration) * w;
+      const x = ((s.start - view.start)/viewDur) * w;
       ctx.beginPath();
       ctx.moveTo(x+0.5,0);
       ctx.lineTo(x+0.5,h);
@@ -1229,7 +1303,7 @@
     ctx.strokeStyle = '#a97c3f';
     ctx.lineWidth = 2;
     manualSplits.forEach(t=>{
-      const x = (t/duration) * w;
+      const x = ((t - view.start)/viewDur) * w;
       ctx.beginPath();
       ctx.moveTo(x,0);
       ctx.lineTo(x,h);
@@ -1238,11 +1312,12 @@
   }
 
   function drawTimeAxis(){
-    const duration = audioBuffer.duration;
+    const view = getViewRange();
+    const viewDur = view.end - view.start;
     const marks = 5;
     let html = '';
     for(let i=0;i<=marks;i++){
-      html += '<span>' + fmtTime(duration * i/marks) + '</span>';
+      html += '<span>' + fmtTime(view.start + viewDur * i/marks) + '</span>';
     }
     timeAxis.innerHTML = html;
   }
@@ -1367,9 +1442,16 @@
     const curTimeInSeg = Math.min(elapsedInBuffer, segDur);
     const curTimeAbs = currentPlayback.start + curTimeInSeg;
 
-    const duration = audioBuffer.duration;
+    // ズーム中、再生位置がウィンドウの端に近づいたら次のウィンドウへページ送りする
+    if(zoomActive && curTimeAbs > viewEnd - ZOOM_WINDOW_SEC * 0.1 && viewEnd < audioBuffer.duration){
+      centerZoomOn(curTimeAbs);
+      drawWaveform();
+      drawTimeAxis();
+    }
+
+    const view = getViewRange();
     const w = canvas.getBoundingClientRect().width;
-    const x = (curTimeAbs / duration) * w;
+    const x = ((curTimeAbs - view.start) / (view.end - view.start)) * w;
     playhead.style.left = x + 'px';
 
     transportTime.textContent = fmtTime(curTimeInSeg) + ' / ' + fmtTime(segDur);
@@ -1411,6 +1493,16 @@
     speedSwitch.classList.toggle('show', mode === 'preview');
     splitHereBtn.classList.toggle('show', mode === 'preview');
     stopPlayback();
+
+    // プレビューモードを離れたら、ズーム表示を解除して全体表示に戻す
+    if(mode !== 'preview' && zoomActive){
+      zoomActive = false;
+      zoomedPeaksCache = null;
+      if(audioBuffer){
+        drawWaveform();
+        drawTimeAxis();
+      }
+    }
   });
 
   // ---------- Speed switch (プレビューモード時の再生速度) ----------
@@ -1440,10 +1532,11 @@
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const ratio = x / rect.width;
-    const t = ratio * audioBuffer.duration;
+    const view = getViewRange();
+    const t = view.start + ratio * (view.end - view.start);
 
     if(interactionMode === 'split'){
-      const pxPerSec = rect.width / audioBuffer.duration;
+      const pxPerSec = rect.width / (view.end - view.start);
       const hitIdx = manualSplits.findIndex(s => Math.abs(s - t) * pxPerSec < 8);
       if(hitIdx >= 0){
         manualSplits.splice(hitIdx, 1);
@@ -1457,8 +1550,12 @@
     }
 
     if(interactionMode === 'preview'){
-      // タップした任意の位置から曲の終端まで、現在の速度設定で再生する
+      // タップした位置を中心に波形を5分幅にズームし、そこから曲の終端まで現在の速度で再生する
+      zoomActive = true;
+      centerZoomOn(t);
       startPlayback(t, audioBuffer.duration, 'プレビュー再生', previewRate, null);
+      drawWaveform();
+      drawTimeAxis();
       return;
     }
 
