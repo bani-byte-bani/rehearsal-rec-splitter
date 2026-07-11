@@ -76,6 +76,23 @@
     color: var(--line);
   }
 
+  .debug-log{
+    display: none;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #1c1a17;
+    color: #8fd18f;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 160px;
+    overflow-y: auto;
+    border-radius: var(--radius);
+  }
+  .debug-log.show{ display: block; }
+
   /* ---------- Main ---------- */
   main{
     flex: 1;
@@ -601,8 +618,9 @@
 <header>
   <div class="eyebrow">Practice Tape Analysis</div>
   <h1>rehearsal-rec-splitter</h1>
-  <div class="sub">長尺の練習音源から、演奏していない無音区間を検出して分解。</div>
+  <div class="sub">長尺の練習音源から、演奏していない無音区間（1分以上）を検出して分解します。</div>
   <div class="build-info" id="buildInfo"></div>
+  <pre class="debug-log" id="debugLog"></pre>
 </header>
 
 <main>
@@ -718,13 +736,31 @@
   const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
 
   // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
-  const BUILD_TIMESTAMP = '2026-07-10 (ズームレベル切替[全体/10分/5分/2分/1分]を追加)';
+  const BUILD_TIMESTAMP = '2026-07-10 (Android調査用: 画面上デバッグログ追加)';
 
   // ---------- DOM refs ----------
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
   const fileInfo = document.getElementById('fileInfo');
   const buildInfo = document.getElementById('buildInfo');
+  const debugLogEl = document.getElementById('debugLog');
+
+  // 画面上に直接ログを出す（Androidなど、コンソールを見られない環境でのデバッグ用）
+  function debugLog(msg){
+    console.log('[DEBUG]', msg);
+    if(!debugLogEl) return;
+    debugLogEl.classList.add('show');
+    const time = new Date().toLocaleTimeString('ja-JP', { hour12:false });
+    debugLogEl.textContent += '[' + time + '] ' + msg + '\n';
+    debugLogEl.scrollTop = debugLogEl.scrollHeight;
+  }
+
+  window.addEventListener('error', (e) => {
+    debugLog('window error: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    debugLog('unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
   const settingsPanel = document.getElementById('settingsPanel');
   const silenceDurSlider = document.getElementById('silenceDurSlider');
   const silenceDurVal = document.getElementById('silenceDurVal');
@@ -739,27 +775,4 @@
   const progressLabel = document.getElementById('progressLabel');
   const result = document.getElementById('result');
   const resultSummary = document.getElementById('resultSummary');
-  const downloadAllBtn = document.getElementById('downloadAllBtn');
-  const modeSwitch = document.getElementById('modeSwitch');
-  const speedSwitch = document.getElementById('speedSwitch');
-  const zoomSwitch = document.getElementById('zoomSwitch');
-  const splitHint = document.getElementById('splitHint');
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  const playhead = document.getElementById('playhead');
-  const timeAxis = document.getElementById('timeAxis');
-  const sectionList = document.getElementById('sectionList');
-  const transport = document.getElementById('transport');
-  const transportBtn = document.getElementById('transportBtn');
-  const transportTitle = document.getElementById('transportTitle');
-  const transportTime = document.getElementById('transportTime');
-  const splitHereBtn = document.getElementById('splitHereBtn');
-
-  // ---------- State ----------
-  let audioCtx = null;
-  let audioBuffer = null;
-  let cachedRms = null;  // RMS解析結果をキャッシュ（設定変更時に再利用）
-  let sourceNode = null;
-  let isPlaying = false;
-  // 再生中の区間情報。segIdxはセクションリストのハイライト対象（プレビュー再生時はnull）
-  let currentPlayback = null; // {start, end, title, 
+  const downloadAllBtn 
