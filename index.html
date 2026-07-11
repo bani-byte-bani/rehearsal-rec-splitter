@@ -52,3 +52,727 @@
     margin-bottom: 6px;
   }
 
+  h1{
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .sub{
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .build-info{
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    color: var(--line);
+  }
+
+  .debug-log{
+    display: none;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #1c1a17;
+    color: #8fd18f;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 160px;
+    overflow-y: auto;
+    border-radius: var(--radius);
+  }
+  .debug-log.show{ display: block; }
+
+  /* ---------- Main ---------- */
+  main{
+    flex: 1;
+    padding: 22px 20px 100px;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ---------- Drop zone ---------- */
+  .dropzone{
+    display: block;
+    position: relative;
+    overflow: hidden;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease;
+    background: var(--bg-soft);
+  }
+  .dropzone.drag{
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .dropzone .icon{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .dropzone .label{
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .dropzone .hint{
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  input[type=file]{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2000px;
+    height: 2000px;
+    opacity: 0;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* ---------- File info ---------- */
+  .file-info{
+    display:none;
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .file-info.show{ display:block; }
+  .file-info b{ color: var(--ink); font-weight: 500; }
+
+  /* ---------- Settings panel ---------- */
+  .settings-panel{
+    display: none;
+    margin-top: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .settings-panel.show{ display: block; }
+
+  .settings-title{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-soft);
+  }
+
+  .setting-row{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .setting-row:last-child{ border-bottom: none; }
+
+  .setting-label{
+    font-size: 13px;
+    color: var(--ink);
+    flex-shrink: 0;
+    width: 120px;
+  }
+  .setting-label span{
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .setting-slider-wrap{
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  input[type=range]{
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 2px;
+    background: var(--line);
+    border-radius: 1px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  input[type=range]::-moz-range-thumb{
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .setting-value{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    width: 56px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .reanalyze-btn{
+    display: none;
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity .15s ease;
+    margin-top: 14px;
+    border-radius: var(--radius);
+  }
+  .reanalyze-btn.show{ display: block; }
+  .reanalyze-btn:active{ opacity: 0.7; }
+
+  /* ---------- Progress ---------- */
+  .progress-wrap{
+    display:none;
+    margin-top: 22px;
+  }
+  .progress-wrap.show{ display:block; }
+  .progress-label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display:flex;
+    justify-content: space-between;
+  }
+  .progress-track{
+    height: 2px;
+    background: var(--line);
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill{
+    position:absolute;
+    top:0; left:0; height:100%;
+    width:0%;
+    background: var(--accent);
+    transition: width .15s ease;
+  }
+
+  /* ---------- Result section ---------- */
+  .result{
+    display:none;
+    margin-top: 30px;
+  }
+  .result.show{ display:block; }
+
+  .result-summary{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+    line-height: 1.8;
+  }
+  .result-summary .num{
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .download-all-btn{
+    display: block;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-soft);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .download-all-btn:hover{
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  /* ---------- Mode / speed controls ---------- */
+  .mode-controls{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .mode-switch, .speed-switch, .zoom-switch{
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .mode-btn, .speed-btn, .zoom-btn{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--bg-soft);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .mode-btn.active, .speed-btn.active, .zoom-btn.active{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  .speed-switch, .zoom-switch{
+    display: none;
+  }
+  .speed-switch.show, .zoom-switch.show{
+    display: flex;
+  }
+  .split-hint{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+
+  /* ---------- Waveform ---------- */
+  .waveform-wrap{
+    position: relative;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  canvas#waveform{
+    display:block;
+    width: 100%;
+    height: 120px;
+    cursor: pointer;
+  }
+  canvas#waveform.split-mode{
+    cursor: crosshair;
+  }
+  canvas#waveform.preview-mode{
+    cursor: text;
+  }
+  .playhead{
+    position:absolute;
+    top:0; bottom:0;
+    width: 1px;
+    background: var(--ink);
+    pointer-events: none;
+    display:none;
+  }
+
+  .time-axis{
+    display:flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    padding: 4px 2px 0;
+    margin-bottom: 22px;
+  }
+
+  /* ---------- Section list ---------- */
+  .section-list{
+    display:flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .seg{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .seg:hover{ background: var(--bg-soft); }
+  .seg.playing{ background: var(--accent-soft); }
+  .seg.silence{
+    background: repeating-linear-gradient(
+      135deg,
+      var(--bg) 0px, var(--bg) 6px,
+      #e2ddd0 6px, #e2ddd0 12px
+    );
+    cursor: default;
+  }
+  .seg.silence:hover{ background: repeating-linear-gradient(
+      135deg,
+      var(--bg) 0px, var(--bg) 6px,
+      #e2ddd0 6px, #e2ddd0 12px
+    ); }
+
+  .seg-index{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    width: 24px;
+    flex-shrink: 0;
+  }
+
+  .seg-play{
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .seg.silence .seg-play{
+    visibility: hidden;
+  }
+  .seg.playing .seg-play{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .seg-body{
+    flex: 1;
+    min-width: 0;
+  }
+  .seg-title{
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .seg.silence .seg-title{
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .seg-time{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .seg-duration{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  .seg-download{
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    flex-shrink: 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .seg-download:hover{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
+  /* ---------- Sticky transport ---------- */
+  .transport{
+    display:none;
+    position: fixed;
+    left:0; right:0; bottom:0;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    align-items:center;
+    gap: 14px;
+  }
+  .transport.show{ display:flex; }
+  .transport-btn{
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 16px;
+  }
+  .transport-info{
+    flex:1;
+    min-width:0;
+  }
+  .transport-title{
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow:hidden;
+    text-overflow: ellipsis;
+  }
+  .transport-time{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .split-here-btn{
+    display: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .split-here-btn.show{ display: block; }
+  .split-here-btn:active{ opacity: 0.7; }
+
+  /* ---------- Misc ---------- */
+  .status-msg{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align:center;
+    padding: 30px 0;
+  }
+
+  ::selection{ background: var(--accent-soft); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Practice Tape Analysis</div>
+  <h1>rehearsal-rec-splitter</h1>
+  <div class="sub">長尺の練習音源から、演奏していない無音区間（1分以上）を検出して分解します。</div>
+  <div class="build-info" id="buildInfo"></div>
+  <pre class="debug-log" id="debugLog"></pre>
+</header>
+
+<main>
+
+  <label class="dropzone" id="dropzone">
+    <div class="icon">Step 01 — Upload</div>
+    <div class="label">MP3ファイルを選択</div>
+    <div class="hint">タップしてファイルを選ぶ、またはドラッグ＆ドロップ</div>
+    <input type="file" id="fileInput" accept="audio/*,.mp3">
+  </label>
+
+  <div class="file-info" id="fileInfo"></div>
+
+  <!-- Settings panel: visible after first analysis -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-title">Step 02 — Detection Settings</div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        無音判定時間
+        <span>この秒数以上続いたら無音区間</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="silenceDurSlider" min="10" max="600" step="10" value="60">
+        <div class="setting-value" id="silenceDurVal">60秒</div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        無音判定閾値
+        <span>この音量以下を無音候補とする</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="silenceDbSlider" min="-60" max="-10" step="1" value="-30">
+        <div class="setting-value" id="silenceDbVal">-30 dB</div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        最小演奏時間
+        <span>これより短い演奏区間は無視</span>
+      </div>
+      <div class="setting-slider-wrap">
+        <input type="range" id="minPlaySlider" min="0" max="180" step="5" value="3">
+        <div class="setting-value" id="minPlayVal">3秒</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="reanalyze-btn" id="reanalyzeBtn">▶ この設定で再判定</button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label">
+      <span id="progressLabel">解析中…</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-summary" id="resultSummary"></div>
+    <button class="download-all-btn" id="downloadAllBtn">⬇ 演奏区間をすべてダウンロード</button>
+
+    <div class="mode-controls">
+      <div class="mode-switch" id="modeSwitch">
+        <button class="mode-btn active" data-mode="normal">▶ 再生</button>
+        <button class="mode-btn" data-mode="split">✂️ 分割</button>
+        <button class="mode-btn" data-mode="preview">⏩ プレビュー</button>
+      </div>
+      <div class="speed-switch" id="speedSwitch">
+        <button class="speed-btn active" data-rate="1">1x</button>
+        <button class="speed-btn" data-rate="1.25">1.25x</button>
+        <button class="speed-btn" data-rate="1.5">1.5x</button>
+        <button class="speed-btn" data-rate="2">2x</button>
+      </div>
+      <div class="zoom-switch" id="zoomSwitch">
+        <button class="zoom-btn" data-zoom="0">全体</button>
+        <button class="zoom-btn" data-zoom="600">10分</button>
+        <button class="zoom-btn active" data-zoom="300">5分</button>
+        <button class="zoom-btn" data-zoom="120">2分</button>
+        <button class="zoom-btn" data-zoom="60">1分</button>
+      </div>
+    </div>
+    <div class="split-hint" id="splitHint">タップした区間を再生します</div>
+
+    <div class="waveform-wrap">
+      <canvas id="waveform"></canvas>
+      <div class="playhead" id="playhead"></div>
+    </div>
+    <div class="time-axis" id="timeAxis"></div>
+
+    <div class="section-list" id="sectionList"></div>
+  </div>
+
+</main>
+
+<div class="transport" id="transport">
+  <div class="transport-btn" id="transportBtn">▶</div>
+  <div class="transport-info">
+    <div class="transport-title" id="transportTitle">—</div>
+    <div class="transport-time" id="transportTime">00:00 / 00:00</div>
+  </div>
+  <button class="split-here-btn" id="splitHereBtn">✂️ ここで分割</button>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------- Analysis interval (fixed) ----------
+  const ANALYSIS_INTERVAL_SEC = 0.2; // RMS解析の時間刻み
+
+  // ---------- Debug: build timestamp (Claudeがファイルを編集するたびに手動更新) ----------
+  const BUILD_TIMESTAMP = '2026-07-10 (Android調査用: 画面上デバッグログ追加)';
+
+  // ---------- DOM refs ----------
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const buildInfo = document.getElementById('buildInfo');
+  const debugLogEl = document.getElementById('debugLog');
+
+  // 画面上に直接ログを出す（Androidなど、コンソールを見られない環境でのデバッグ用）
+  function debugLog(msg){
+    console.log('[DEBUG]', msg);
+    if(!debugLogEl) return;
+    debugLogEl.classList.add('show');
+    const time = new Date().toLocaleTimeString('ja-JP', { hour12:false });
+    debugLogEl.textContent += '[' + time + '] ' + msg + '\n';
+    debugLogEl.scrollTop = debugLogEl.scrollHeight;
+  }
+
+  window.addEventListener('error', (e) => {
+    debugLog('window error: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    debugLog('unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+  const settingsPanel = document.getElementById('settingsPanel');
+  const silenceDurSlider = document.getElementById('silenceDurSlider');
+  const silenceDurVal = document.getElementById('silenceDurVal');
+  const silenceDbSlider = document.getElementById('silenceDbSlider');
+  const silenceDbVal = document.getElementById('silenceDbVal');
+  const minPlaySlider = document.getElementById('minPlaySlider');
+  const minPlayVal = document.getElementById('minPlayVal');
+  const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const progressPct = document.getElementById('progressPct');
+  const progressLabel = document.getElementById('progressLabel');
+  const result = document.getElementById('result');
+  const resultSummary = document.getElementById('resultSummary');
+  const downloadAllBtn <!DOCTYPE h
